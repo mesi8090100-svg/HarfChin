@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Unzip newest project
+        run: |
+          Z=$(ls harfchin3_v*.zip 2>/dev/null | sort -V | tail -1)
+          [ -z "$Z" ] && Z=harfchin3.zip
+          echo "Using $Z"
+          unzip -q -o "$Z" -d src_build
+          D=$(dirname "$(find src_build -maxdepth 3 -name gradlew | head -1)")
+          echo "PROJ=$D" >> "$GITHUB_ENV"
+          chmod +x "$D/gradlew" "$D/gradlew.real"
+
+      - name: Build APK
+        run: cd "$PROJ" && ./gradlew assembleDebug --no-daemon
+
+      - name: Unit tests
+        continue-on-error: true
+        run: cd "$PROJ" && ./gradlew testDebugUnitTest --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HarfChin-APK
+          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-report
+          path: ${{ env.PROJ }}/app/build/reports/tests/
