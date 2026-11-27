@@ -17,16 +17,20 @@ jobs:
 
       - name: Unzip newest project
         run: |
-          Z=$(ls harfchin3_v*.zip 2>/dev/null | sort -V | tail -1)
-          [ -z "$Z" ] && Z=harfchin3.zip
+          Z=$(ls harfchin3_v*.zip | sort -V | tail -1)
           echo "Using $Z"
           unzip -q -o "$Z" -d src_build
           D=$(dirname "$(find src_build -maxdepth 3 -name gradlew | head -1)")
+          V=$(grep -oP 'versionName = "\K[^"]+' "$D/app/build.gradle.kts")
           echo "PROJ=$D" >> "$GITHUB_ENV"
+          echo "VER=$V" >> "$GITHUB_ENV"
+          echo "### Building HarfChin $V from $Z" >> "$GITHUB_STEP_SUMMARY"
           chmod +x "$D/gradlew" "$D/gradlew.real"
 
       - name: Build APK
-        run: cd "$PROJ" && ./gradlew assembleDebug --no-daemon
+        run: |
+          cd "$PROJ" && ./gradlew assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk "app/build/outputs/apk/debug/HarfChin-v${VER}.apk"
 
       - name: Unit tests
         continue-on-error: true
@@ -34,11 +38,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: HarfChin-APK
-          path: ${{ env.PROJ }}/app/build/outputs/apk/debug/*.apk
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-report
-          path: ${{ env.PROJ }}/app/build/reports/tests/
+          name: HarfChin-v${{ env.VER }}
+          path: ${{ env.PROJ }}/app/bu
